@@ -1,0 +1,2103 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>זקופה מול הסופה</title>
+  <style>
+    :root {
+      --bg-sky: #d8eefc;
+      --bg-snow: #f5fbff;
+      --accent: #1a7ab8;
+      --accent-hot: #e85d04;
+      --team-a: #0ea5c6;
+      --team-b: #5b7cfa;
+      --text: #1a3a52;
+      --muted: #5a7a92;
+      --panel: rgba(255, 255, 255, 0.72);
+      --ok: #16a34a;
+      --bad: #dc2626;
+      --card-ice: linear-gradient(155deg, #ffffff 0%, #e8f6ff 45%, #cfe9fb 100%);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: "Avenir Next", "Segoe UI", "Heebo", "Arial Hebrew", sans-serif;
+      color: var(--text);
+      background: #b8dcf5;
+    }
+
+    body {
+      /* אותו רקע של דף הפתיחה, מרוכך בצעיף לבנבן כדי שהקלפים יבלטו מעליו */
+      background:
+        linear-gradient(180deg, rgba(247, 252, 255, 0.66), rgba(222, 240, 253, 0.74)),
+        url("intro-bg.png") center center / cover no-repeat fixed;
+    }
+
+    #snow {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.35;
+    }
+
+    .stage {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: clamp(12px, 1.8vw, 24px);
+      gap: clamp(10px, 1.2vw, 16px);
+      /* no z-index: the active team name has to be able to rise above the
+         question overlay (z-index 70), which a stacking context here would block */
+      position: relative;
+    }
+
+    header.topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      gap: clamp(10px, 2vw, 34px);
+      align-items: center;
+      text-align: center;
+    }
+
+    header .title-logo {
+      display: block;
+      grid-column: 2;
+      justify-self: center;
+      margin: 0;
+      width: auto;
+      height: clamp(76px, 12.3vh, 154px);
+      max-width: 100%;
+      opacity: 0.55;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+      transform-origin: 50% 60%;
+      filter: drop-shadow(0 6px 18px rgba(10, 62, 102, 0.35));
+      animation: titleBreathe 7s ease-in-out infinite;
+    }
+
+    @keyframes titleBreathe {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+        filter: drop-shadow(0 6px 18px rgba(10, 62, 102, 0.35))
+                drop-shadow(0 0 10px rgba(150, 215, 255, 0.35));
+      }
+      50% {
+        transform: translateY(-4px) scale(1.022);
+        filter: drop-shadow(0 12px 26px rgba(10, 62, 102, 0.42))
+                drop-shadow(0 0 22px rgba(150, 215, 255, 0.75));
+      }
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid rgba(26, 122, 184, 0.2);
+      padding: 9px 14px;
+      border-radius: 12px;
+      transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover { background: #fff; transform: translateY(-1px); }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    button.primary {
+      background: linear-gradient(135deg, #3aa0d8, #1a7ab8);
+      color: #fff;
+      font-weight: 800;
+      border: none;
+      box-shadow: 0 8px 24px rgba(26, 122, 184, 0.35);
+    }
+
+    .boards {
+      display: grid;
+      grid-template-columns: 1fr clamp(24px, 4vw, 56px) 1fr;
+      gap: clamp(10px, 1.5vw, 22px);
+      min-height: 0;
+      height: 100%;
+    }
+
+    .side {
+      display: grid;
+      grid-template-rows: 1fr;
+      gap: 10px;
+      min-height: 0;
+      min-width: 0;
+      transition: opacity 0.5s ease, filter 0.5s ease;
+    }
+
+    /* ניצחון: המפסידה נסוגה, המנצחת גדלה ועולה מעל אפקט הניצחון */
+    body.won-a .side.b,
+    body.won-b .side.a,
+    body.won-a .side-head.b,
+    body.won-b .side-head.a {
+      opacity: 0.26;
+      filter: saturate(0.4);
+    }
+
+    body.won-a .side-head.a,
+    body.won-b .side-head.b {
+      opacity: 1;
+      z-index: 90;
+      transform: scale(1.28);
+    }
+
+    body.won-a header .title-logo,
+    body.won-b header .title-logo { opacity: 0.2; }
+
+    .side-head {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      justify-self: center;
+      max-width: 100%;
+      padding: 0;
+      margin-top: clamp(14px, 2.6vh, 32px);
+      min-width: 0;
+    }
+
+    .side-head.a { grid-column: 1; }
+    .side-head.b { grid-column: 3; }
+
+    /* while a question is open the board dims behind the overlay, so the asking
+       team's name is pulled above it and everything else in the row steps back */
+    .side-head,
+    header .title-logo {
+      position: relative;
+      transition: opacity 0.3s ease, filter 0.4s ease,
+                  transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    body.asking .side-head,
+    body.asking header .title-logo { opacity: 0.3; }
+
+    body.asking-a .side-head.a,
+    body.asking-b .side-head.b {
+      opacity: 1;
+      z-index: 76;
+      transform: scale(1.08);
+    }
+
+    .side-head .team-logo {
+      display: block;
+      width: auto;
+      height: clamp(59px, 9.2vh, 116px);
+      max-width: 100%;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
+      transform-origin: 50% 70%;
+      animation: teamFloat 5.5s ease-in-out infinite;
+    }
+
+    .side-head.a .team-logo {
+      height: clamp(73px, 11.2vh, 142px);
+      filter: drop-shadow(0 4px 10px rgba(8, 58, 95, 0.3))
+              drop-shadow(0 0 8px rgba(14, 165, 198, 0.45));
+    }
+
+    .side-head.b .team-logo {
+      animation-delay: -2.75s;
+      filter: drop-shadow(0 4px 10px rgba(8, 58, 95, 0.3))
+              drop-shadow(0 0 8px rgba(91, 124, 250, 0.45));
+    }
+
+    @keyframes teamFloat {
+      0%, 100% { transform: translateY(0) rotate(-0.5deg) scale(1); }
+      50%      { transform: translateY(-5px) rotate(0.5deg) scale(1.028); }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: clamp(6px, 1vw, 12px);
+      min-height: 0;
+      height: 100%;
+    }
+
+    .card {
+      position: relative;
+      perspective: 900px;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      padding: 0;
+      min-height: 0;
+      border-radius: 14px;
+      box-shadow: 0 11px 26px rgba(8, 48, 86, 0.38), 0 3px 8px rgba(8, 48, 86, 0.22);
+    }
+
+    .side.a .card {
+      box-shadow: 0 11px 26px rgba(8, 48, 86, 0.36), 0 3px 10px rgba(14, 165, 198, 0.38);
+    }
+
+    .side.b .card {
+      box-shadow: 0 11px 26px rgba(8, 48, 86, 0.36), 0 3px 10px rgba(91, 124, 250, 0.38);
+    }
+
+    .card:disabled { cursor: default; opacity: 1; }
+
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+      border-radius: 14px;
+    }
+
+    .card.open .card-inner,
+    .card.solved .card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .face.back {
+      background:
+        url("card-frame.png") center center / 100% 100% no-repeat,
+        var(--card-ice);
+      border: none;
+    }
+
+    .face .icon {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 78%;
+      height: 70%;
+      object-fit: contain;
+      filter:
+        drop-shadow(0 0 9px rgba(255, 255, 255, 0.9))
+        drop-shadow(0 6px 13px rgba(10, 62, 102, 0.45))
+        saturate(1.14) contrast(1.07);
+      user-select: none;
+      -webkit-user-drag: none;
+      transition: transform 0.25s ease;
+    }
+
+    .card:not(.solved):not(.open):hover .face.back .icon {
+      transform: scale(1.08);
+    }
+
+    /* ההצללה יושבת על המסגרת בלבד — מרכז הקלף נשאר בהיר */
+    .face::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      border-radius: 14px;
+      box-shadow: inset 0 0 15px rgba(10, 52, 92, 0.26);
+      transition: box-shadow 0.25s ease;
+    }
+
+    /* הקלפים שעוד לא נפתרו מוצללים יותר, כדי שקלף הכוכב יבלוט מולם */
+    .card:not(.solved) .face.back::after {
+      box-shadow:
+        inset 0 0 20px rgba(10, 52, 92, 0.44),
+        inset 0 0 7px rgba(10, 52, 92, 0.3);
+    }
+
+    .card:not(.solved):not(.open):hover .face.back::after {
+      box-shadow: inset 0 0 13px rgba(10, 52, 92, 0.14);
+    }
+
+    .face.front {
+      transform: rotateY(180deg);
+      background:
+        url("card-frame.png") center center / 100% 100% no-repeat,
+        var(--card-ice);
+      border: none;
+      padding: 0;
+    }
+
+    .card.solved .face.front {
+      background:
+        url("card-solved.png") center center / 100% 100% no-repeat,
+        var(--card-ice);
+      box-shadow: 0 9px 22px rgba(8, 58, 95, 0.34), 0 0 22px rgba(250, 204, 21, 0.45);
+    }
+
+    /* the star is warm, so it gets a gold halo instead of the icy one */
+    .face.front .icon {
+      width: 90%;
+      height: 82%;
+      filter:
+        drop-shadow(0 0 10px rgba(255, 255, 255, 0.85))
+        drop-shadow(0 5px 14px rgba(120, 70, 10, 0.4))
+        drop-shadow(0 0 18px rgba(250, 204, 21, 0.55))
+        saturate(1.1);
+    }
+
+    .card.solved .face.front::after {
+      box-shadow: inset 0 0 15px rgba(10, 52, 92, 0.2);
+    }
+
+    .card.solved .card-inner { transform: rotateY(180deg) scale(1.035); }
+
+    /* הקלף שזה עתה זכה בכוכב — ממשיך את הרצף אחרי שכרטיס השאלה נסגר */
+    .card.just-won { z-index: 3; animation: wonGlow 1.2s ease-out; }
+    .card.just-won .card-inner { animation: wonPop 1.2s cubic-bezier(0.22, 1, 0.36, 1); }
+
+    @keyframes wonPop {
+      0%   { transform: rotateY(180deg) scale(0.5); }
+      34%  { transform: rotateY(180deg) scale(1.24); }
+      54%  { transform: rotateY(180deg) scale(0.95); }
+      74%  { transform: rotateY(180deg) scale(1.09); }
+      88%  { transform: rotateY(180deg) scale(1.0); }
+      100% { transform: rotateY(180deg) scale(1.035); }
+    }
+
+    @keyframes wonGlow {
+      0%   { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.95), 0 11px 26px rgba(8, 48, 86, 0.38); }
+      30%  { box-shadow: 0 0 38px 12px rgba(250, 204, 21, 0.8), 0 11px 26px rgba(8, 48, 86, 0.38); }
+      100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0), 0 11px 26px rgba(8, 48, 86, 0.38); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card.just-won,
+      .card.just-won .card-inner { animation: none; }
+    }
+    .card.solved { z-index: 1; }
+
+    .face.front .mark {
+      font-size: clamp(1.5rem, 3.5vw, 2.6rem);
+      line-height: 1;
+      color: var(--accent);
+    }
+
+    .card:not(.solved):not(.open):hover .card-inner {
+      filter: brightness(1.05);
+    }
+
+    .card.pulse { animation: cardPulse 0.55s ease; }
+
+    @keyframes cardPulse {
+      0%, 100% { transform: scale(1); }
+      40% { transform: scale(1.06); }
+    }
+
+    .card.win-line .face.front {
+      box-shadow: 0 0 0 3px #f59e0b, 0 0 28px rgba(245, 158, 11, 0.5);
+      animation: winCard 1.1s ease-in-out infinite;
+    }
+
+    .card.win-line {
+      animation: winPulse 1.1s ease-in-out infinite;
+      z-index: 2;
+    }
+
+    @keyframes winCard {
+      50% {
+        filter: brightness(1.12);
+        box-shadow: 0 0 0 3px #fbbf24, 0 0 38px rgba(245, 158, 11, 0.78);
+      }
+    }
+
+    @keyframes winPulse {
+      50% { filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.6)); }
+    }
+
+    .center { pointer-events: none; }
+
+    /* Timer — top, above question */
+    .timer-dock {
+      position: fixed;
+      left: 50%;
+      top: clamp(10px, 2.2vh, 24px);
+      transform: translate(-50%, -12px) scale(0.9);
+      z-index: 85;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.35s ease, visibility 0.35s, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .timer-dock.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0) scale(1);
+    }
+
+    .timer {
+      position: relative;
+      width: clamp(168px, 18vw, 248px);
+      height: clamp(168px, 18vw, 248px);
+      display: grid;
+      place-items: center;
+    }
+
+    .timer.urgent {
+      animation: timerShake 0.4s ease-in-out infinite;
+    }
+
+    /* מסגרות הקרח — כחולה כברירת מחדל, אדומה כשנגמר הזמן */
+    .timer-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      z-index: 2;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      filter: drop-shadow(0 8px 20px rgba(10, 52, 92, 0.4));
+      transition: opacity 0.4s ease;
+    }
+
+    .timer-frame.hot { opacity: 0; }
+    .timer.urgent .timer-frame.cold { opacity: 0; }
+    .timer.urgent .timer-frame.hot { opacity: 1; }
+
+    .timer::before {
+      content: "";
+      position: absolute;
+      inset: -14%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(26, 122, 184, 0.25) 0%, transparent 68%);
+      animation: timerAura 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .timer.running::before {
+      background: radial-gradient(circle, rgba(26, 122, 184, 0.4) 0%, transparent 70%);
+      animation: timerAura 1.2s ease-in-out infinite;
+    }
+
+    .timer.urgent::before {
+      background: radial-gradient(circle, rgba(220, 38, 38, 0.5) 0%, transparent 70%);
+      animation: timerAuraUrgent 0.5s ease-in-out infinite;
+    }
+
+    @keyframes timerAura {
+      0%, 100% { transform: scale(0.92); opacity: 0.55; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+
+    @keyframes timerAuraUrgent {
+      0%, 100% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.16); opacity: 1; }
+    }
+
+    /* העדשה הפנימית — יושבת בתוך החור של המסגרת */
+    .timer-ring {
+      position: absolute;
+      inset: 17%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.95), transparent 45%),
+        radial-gradient(circle at 50% 50%, #ffffff 0%, #dff0fb 72%);
+      box-shadow:
+        inset 0 0 18px rgba(255, 255, 255, 0.8),
+        0 6px 18px rgba(26, 80, 120, 0.22);
+    }
+
+    .timer.urgent .timer-ring {
+      box-shadow:
+        inset 0 0 18px rgba(255, 255, 255, 0.8),
+        0 0 30px rgba(220, 38, 38, 0.4);
+    }
+
+    @keyframes timerShake {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    .timer-ring svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      overflow: visible;
+    }
+
+    .timer-ring .track {
+      fill: none;
+      stroke: rgba(26, 122, 184, 0.12);
+      stroke-width: 5.5;
+    }
+
+    .timer-ring .progress {
+      fill: none;
+      stroke: url(#timerGrad);
+      stroke-width: 5.5;
+      stroke-linecap: round;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.12s linear;
+      filter: drop-shadow(0 0 6px rgba(26, 122, 184, 0.5));
+    }
+
+    .timer.urgent .timer-ring .progress {
+      stroke: url(#timerGradUrgent);
+      filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.8));
+    }
+
+    .timer-ring .ticks {
+      fill: none;
+      stroke: rgba(26, 122, 184, 0.2);
+      stroke-width: 1.2;
+    }
+
+    .timer-core {
+      position: absolute;
+      inset: 18%;
+      z-index: 3;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: linear-gradient(160deg, #ffffff, #eef8ff);
+      border: 1px solid rgba(26, 122, 184, 0.15);
+    }
+
+    .timer-num {
+      font-size: clamp(1.7rem, 3.7vw, 2.7rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: var(--accent);
+      transition: transform 0.12s ease, color 0.2s;
+    }
+
+    .timer-num.pop {
+      animation: countPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes countPop {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.35); }
+      100% { transform: scale(1); }
+    }
+
+    .timer.urgent .timer-num {
+      color: #dc2626;
+      animation: numBeatUrgent 0.45s ease-in-out infinite;
+    }
+
+    @keyframes numBeatUrgent {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.14); }
+    }
+
+    .timer-label {
+      font-size: clamp(0.55rem, 0.85vw, 0.7rem);
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+    }
+
+    .timer.urgent .timer-label { color: #dc2626; }
+
+    /* Overlays */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      background: #8ec8ef;
+      transition: opacity 0.45s, visibility 0.45s;
+      padding: 20px;
+    }
+
+    #intro {
+      background:
+        url("intro-bg.png") center center / cover no-repeat;
+      place-items: center;
+      padding: clamp(16px, 4vh, 48px);
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .overlay-inner { text-align: center; }
+
+    #intro .overlay-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(20px, 5vh, 60px);
+    }
+
+    /* Intro logo */
+    .intro-logo-wrap {
+      width: min(76vw, 1040px, 150vh);
+      animation: logoDrop 1.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    .intro-logo-float {
+      position: relative;
+      animation: logoFloat 5.5s ease-in-out 1.25s infinite;
+    }
+
+    .intro-logo-float::before {
+      content: "";
+      position: absolute;
+      inset: -14% -9%;
+      z-index: -1;
+      border-radius: 50%;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(165, 232, 255, 0.55) 0%,
+        rgba(26, 122, 184, 0.28) 45%,
+        rgba(26, 122, 184, 0) 72%
+      );
+      filter: blur(30px);
+      animation: logoGlow 3.8s ease-in-out 1.25s infinite;
+    }
+
+    .intro-logo {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 18px 38px rgba(8, 54, 92, 0.45));
+    }
+
+    .intro-logo-shine {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      background: linear-gradient(
+        105deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.55) 47%,
+        rgba(255, 255, 255, 0.9) 50%,
+        rgba(255, 255, 255, 0.55) 53%,
+        transparent 60%
+      );
+      background-size: 280% 100%;
+      background-repeat: no-repeat;
+      -webkit-mask: url("intro-logo.png") center / 100% 100% no-repeat;
+      mask: url("intro-logo.png") center / 100% 100% no-repeat;
+      animation: logoShine 5s ease-in-out 1.9s infinite;
+    }
+
+    @keyframes logoDrop {
+      0% {
+        opacity: 0;
+        transform: translateY(-48vh) scale(0.55) rotate(-7deg);
+        filter: blur(14px);
+      }
+      55% {
+        opacity: 1;
+        filter: blur(0);
+      }
+      70% { transform: translateY(16px) scale(1.07) rotate(1.6deg); }
+      85% { transform: translateY(-7px) scale(0.985) rotate(-0.9deg); }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotate(0deg);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-15px) rotate(0.6deg); }
+    }
+
+    @keyframes logoGlow {
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.07); }
+    }
+
+    @keyframes logoShine {
+      0% { background-position: 170% 0; }
+      42%, 100% { background-position: -70% 0; }
+    }
+
+    @keyframes ctaIn {
+      from { opacity: 0; transform: translateY(26px) scale(0.9); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes ctaPulse {
+      0%, 100% { box-shadow: 0 12px 32px rgba(10, 60, 100, 0.35), 0 0 0 0 rgba(125, 211, 252, 0.55); }
+      50% { box-shadow: 0 12px 32px rgba(10, 60, 100, 0.35), 0 0 0 16px rgba(125, 211, 252, 0); }
+    }
+
+    .overlay .big-cta {
+      font-size: clamp(1.4rem, 3vw, 1.8rem);
+      padding: 18px 56px;
+      border-radius: 16px;
+      letter-spacing: 0.06em;
+      box-shadow: 0 12px 32px rgba(10, 60, 100, 0.35);
+    }
+
+    #intro .big-cta {
+      animation:
+        ctaIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both,
+        ctaPulse 2.6s ease-in-out 2s infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .intro-logo-wrap,
+      .intro-logo-float,
+      .intro-logo-float::before,
+      .intro-logo-shine,
+      #intro .big-cta {
+        animation: none;
+      }
+      .intro-logo-shine { opacity: 0; }
+      #intro .big-cta { opacity: 1; }
+      header .title-logo,
+      .side-head .team-logo { animation: none; }
+    }
+
+    .victory-fx {
+      position: fixed;
+      inset: 0;
+      z-index: 88;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.45s ease, visibility 0.45s;
+    }
+
+    .victory-fx:not(.hidden) {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .victory-fx.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .victory-burst {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      animation: burstPulse 1.2s ease-out forwards;
+    }
+
+    .victory-fx.team-a .victory-burst {
+      background: radial-gradient(circle at 50% 45%, rgba(14, 165, 198, 0.4), transparent 55%);
+    }
+
+    .victory-fx.team-b .victory-burst {
+      background: radial-gradient(circle at 50% 45%, rgba(91, 124, 250, 0.4), transparent 55%);
+    }
+
+    @keyframes burstPulse {
+      0% { opacity: 0; transform: scale(0.7); }
+      35% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 0.25; transform: scale(1.25); }
+    }
+
+    .victory-inner {
+      position: relative;
+      text-align: center;
+      padding: 32px 44px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(26, 122, 184, 0.3);
+      box-shadow: 0 20px 60px rgba(26, 80, 120, 0.2);
+      animation: victoryPop 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      max-width: 90vw;
+    }
+
+    @keyframes victoryPop {
+      from { opacity: 0; transform: scale(0.6) translateY(30px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .victory-crown {
+      font-size: clamp(2.4rem, 6vw, 3.6rem);
+      margin-bottom: 8px;
+      animation: crownSpin 1.2s ease-in-out infinite;
+      filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
+    }
+
+    @keyframes crownSpin {
+      0%, 100% { transform: scale(1) rotate(-6deg); }
+      50% { transform: scale(1.12) rotate(6deg); }
+    }
+
+    .victory-fx p {
+      color: var(--accent);
+      font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+      font-weight: 800;
+      margin-bottom: 22px;
+    }
+
+    .victory-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(210, 232, 248, 0.72);
+      padding:
+        clamp(140px, 22vh, 200px)
+        clamp(16px, 3vw, 40px)
+        clamp(16px, 3vh, 36px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      pointer-events: none;
+    }
+
+    .modal.show {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      /* the ice panel is drawn as a 9-slice border-image, so the corner crystals
+         keep their shape whatever height the question needs */
+      --panel-edge: clamp(24px, 3.1vw, 44px);
+      width: min(820px, 100%);
+      max-height: min(58vh, 520px);
+      overflow: auto;
+      background: transparent;
+      border-style: solid;
+      border-width: var(--panel-edge) calc(var(--panel-edge) * 1.2);
+      border-color: transparent;
+      border-image:
+        url("question-panel.png") 125 150 fill /
+        var(--panel-edge) calc(var(--panel-edge) * 1.2) /
+        0 stretch;
+      border-radius: 0;
+      padding: clamp(6px, 1.2vw, 16px) clamp(10px, 1.6vw, 22px) clamp(10px, 1.4vw, 18px);
+      filter: drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      transform: translateY(24px);
+      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: auto;
+    }
+
+    .modal.show .modal-card { transform: none; }
+
+    /* סגירת הכרטיס: התנפחות קצרה ואז התכווצות והיעלמות, בגוון הפסיקה */
+    .modal-card.seal-ok {
+      animation: sealOk 0.9s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+    }
+
+    .modal-card.seal-bad {
+      animation: sealBad 1s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+    }
+
+    @keyframes sealOk {
+      0% {
+        transform: scale(1);
+        filter: drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      }
+      22% {
+        transform: scale(1.04);
+        filter: drop-shadow(0 0 30px rgba(16, 185, 104, 0.9))
+                drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      }
+      45% {
+        transform: scale(1.01);
+        filter: drop-shadow(0 0 22px rgba(16, 185, 104, 0.6))
+                drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      }
+      100% {
+        transform: scale(0.62) translateY(14px);
+        opacity: 0;
+        filter: drop-shadow(0 0 8px rgba(16, 185, 104, 0.25));
+      }
+    }
+
+    @keyframes sealBad {
+      0%  { transform: scale(1) translateX(0); }
+      10% {
+        transform: scale(0.995) translateX(-9px);
+        filter: drop-shadow(0 0 26px rgba(224, 31, 61, 0.75))
+                drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      }
+      22% { transform: scale(0.995) translateX(9px); }
+      34% { transform: scale(0.995) translateX(-6px); }
+      46% { transform: scale(1) translateX(3px); }
+      56% {
+        transform: scale(1) translateX(0);
+        filter: drop-shadow(0 0 18px rgba(224, 31, 61, 0.45))
+                drop-shadow(0 22px 42px rgba(14, 62, 100, 0.34));
+      }
+      100% {
+        transform: scale(0.62) translateY(14px);
+        opacity: 0;
+        filter: drop-shadow(0 0 8px rgba(224, 31, 61, 0.22));
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .modal-card.seal-ok,
+      .modal-card.seal-bad { animation: none; opacity: 0; }
+    }
+
+    .modal h3 {
+      font-size: clamp(1.15rem, 2.5vw, 1.7rem);
+      font-weight: 700;
+      line-height: 1.4;
+      margin-bottom: 14px;
+      text-align: center;
+      color: #0b3f66;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 10px rgba(255, 255, 255, 0.7);
+    }
+
+    .choices { display: grid; gap: 10px; margin-bottom: 12px; }
+
+    .choice {
+      text-align: right;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(26, 122, 184, 0.06);
+      border: 1px solid rgba(26, 122, 184, 0.15);
+      font-size: clamp(1rem, 1.8vw, 1.15rem);
+      font-weight: 600;
+      width: 100%;
+    }
+
+    .choice:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(26, 122, 184, 0.12);
+    }
+
+    .choice.correct {
+      border-color: var(--ok);
+      background: rgba(22, 163, 74, 0.12);
+      color: var(--ok);
+    }
+
+    .choice.wrong {
+      border-color: var(--bad);
+      background: rgba(220, 38, 38, 0.1);
+      color: var(--bad);
+    }
+
+    .choices {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(6px, 0.9vw, 12px);
+      margin: 0 0 14px;
+      text-align: right;
+    }
+
+    .choices li { display: flex; }
+
+    .choice {
+      flex: 1;
+      cursor: pointer;
+      text-align: right;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: clamp(7px, 1vw, 11px) clamp(10px, 1.3vw, 16px);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(26, 122, 184, 0.3);
+      box-shadow: 0 2px 6px rgba(14, 62, 100, 0.1);
+      color: #0b3f66;
+      font-weight: 600;
+      font-size: clamp(0.9rem, 1.6vw, 1.12rem);
+      line-height: 1.35;
+      transition: background 0.25s, border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+    }
+
+    .choice-key {
+      flex: none;
+      width: 1.7em;
+      height: 1.7em;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(26, 122, 184, 0.14);
+      color: var(--accent);
+      font-weight: 800;
+    }
+
+    .choice:hover {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(26, 122, 184, 0.6);
+      box-shadow: 0 4px 12px rgba(14, 62, 100, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .choices.locked .choice { cursor: default; pointer-events: none; }
+
+    .choices.locked .choice:not(.is-correct):not(.is-wrong) { opacity: 0.55; }
+
+    .choice.is-wrong {
+      background: rgba(254, 232, 232, 0.95);
+      border-color: #dc2626;
+      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3), 0 4px 14px rgba(220, 38, 38, 0.22);
+    }
+
+    .choice.is-wrong .choice-key {
+      background: #dc2626;
+      color: #fff;
+    }
+
+    .choice.is-correct {
+      background: rgba(226, 252, 235, 0.95);
+      border-color: #15a349;
+      box-shadow: 0 0 0 2px rgba(21, 163, 73, 0.35), 0 4px 14px rgba(21, 163, 73, 0.25);
+      transform: scale(1.02);
+    }
+
+    .choice.is-correct .choice-key {
+      background: #15a349;
+      color: #fff;
+    }
+
+    @media (max-width: 760px) {
+      .choices { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .judge-row {
+      --judge-gap: clamp(18px, 2.6vw, 30px);
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--judge-gap);
+      justify-content: center;
+      margin-top: var(--judge-gap);
+    }
+
+    .judge-row .verdict {
+      position: relative;
+      width: clamp(60px, 8vw, 80px);
+      height: clamp(60px, 8vw, 80px);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: clamp(1.7rem, 3.3vw, 2.25rem);
+      font-weight: 800;
+      line-height: 1;
+      padding: 0;
+      color: #fff;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      text-shadow: 0 2px 5px rgba(4, 30, 20, 0.35);
+      transition: transform 0.14s ease, box-shadow 0.22s ease, filter 0.2s ease;
+    }
+
+    /* הבזק לבן קצר ברגע הלחיצה */
+    .judge-row .verdict::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+    }
+
+    .judge-row .verdict:active:not(:disabled)::after {
+      opacity: 0.6;
+      transition-duration: 0s;
+    }
+
+    .judge-row .verdict:active:not(:disabled) {
+      transform: scale(0.91);
+      transition-duration: 0.07s;
+    }
+
+    /* הצלחה — אזמרגד עם זוהר נושם */
+    .judge-row .verdict.ok {
+      background: radial-gradient(circle at 34% 28%, #4fdd93 0%, #10b968 44%, #04774a 100%);
+      animation: verdictGlow 2.4s ease-in-out infinite;
+    }
+
+    @keyframes verdictGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 4px rgba(16, 185, 104, 0.2),
+                    0 0 18px rgba(16, 185, 104, 0.45),
+                    0 8px 18px rgba(6, 58, 38, 0.35);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(16, 185, 104, 0.1),
+                    0 0 32px rgba(16, 185, 104, 0.7),
+                    0 8px 18px rgba(6, 58, 38, 0.35);
+      }
+    }
+
+    /* כישלון — אודם */
+    .judge-row .verdict.bad {
+      background: radial-gradient(circle at 34% 28%, #ff8080 0%, #e01f3d 44%, #8d0f22 100%);
+      box-shadow: 0 0 0 4px rgba(224, 31, 61, 0.18),
+                  0 0 18px rgba(224, 31, 61, 0.4),
+                  0 8px 18px rgba(74, 10, 22, 0.35);
+    }
+
+    .judge-row .verdict:hover:not(:disabled) {
+      transform: translateY(-3px) scale(1.07);
+      filter: brightness(1.08);
+    }
+
+    #confetti {
+      position: fixed;
+      inset: 0;
+      z-index: 75;
+      pointer-events: none;
+    }
+
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      html, body { height: auto; min-height: 100%; }
+      .stage { height: auto; min-height: 100vh; }
+      .boards {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+      }
+      .center { min-height: 8px; }
+      .modal { padding-top: clamp(120px, 18vh, 160px); }
+      .grid { min-height: 280px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="snow" aria-hidden="true"></canvas>
+
+  <div class="overlay" id="intro">
+    <div class="overlay-inner">
+      <div class="intro-logo-wrap">
+        <div class="intro-logo-float">
+          <img class="intro-logo" src="intro-logo.png" alt="זקופה מול הסופה" />
+          <span class="intro-logo-shine" aria-hidden="true"></span>
+        </div>
+      </div>
+      <button class="primary big-cta" id="btnStart">התחל</button>
+    </div>
+  </div>
+
+  <div class="victory-fx hidden" id="victory" aria-hidden="true">
+    <div class="victory-burst" aria-hidden="true"></div>
+    <div class="victory-inner">
+      <div class="victory-crown">🏆</div>
+      <p id="victoryText">ארבעה ברצף</p>
+      <div class="victory-actions">
+        <button type="button" class="primary" id="btnContinue">המשך משחק</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="qModal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h3 id="qText">שאלה</h3>
+      <div id="qBody"></div>
+      <div class="judge-row" id="judgeRow">
+        <button type="button" class="verdict ok" id="btnCorrect" aria-label="הצלחה" title="הצלחה">✓</button>
+        <button type="button" class="verdict bad" id="btnWrong" aria-label="כישלון" title="כישלון">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="confetti"></canvas>
+
+  <div class="timer-dock" id="timerDock" aria-hidden="true">
+    <div class="timer" id="timer">
+      <img class="timer-frame cold" src="timer-blue.png" alt="" aria-hidden="true" />
+      <img class="timer-frame hot" src="timer-red.png" alt="" aria-hidden="true" />
+      <div class="timer-ring">
+        <svg viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#7dd3fc" />
+              <stop offset="45%" stop-color="#1a7ab8" />
+              <stop offset="100%" stop-color="#0369a1" />
+            </linearGradient>
+            <linearGradient id="timerGradUrgent" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#fca5a5" />
+              <stop offset="50%" stop-color="#ef4444" />
+              <stop offset="100%" stop-color="#b91c1c" />
+            </linearGradient>
+          </defs>
+          <circle class="track" cx="50" cy="50" r="45" />
+          <circle class="ticks" id="timerTicks" cx="50" cy="50" r="38" />
+          <circle class="progress" id="timerArc" cx="50" cy="50" r="45" />
+        </svg>
+        <div class="timer-core">
+          <div class="timer-num" id="timerNum">—</div>
+          <div class="timer-label" id="timerLabel">זמן</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <header class="topbar">
+      <div class="side-head a">
+        <img class="team-logo" src="team-a-logo.png" alt="מעפילה" />
+      </div>
+      <img class="title-logo" src="title-logo.png" alt="זקופה מול הסופה" />
+      <div class="side-head b">
+        <img class="team-logo" src="team-b-logo.png" alt="מטפסת" />
+      </div>
+    </header>
+    <div class="boards">
+      <section class="side a" id="sideA">
+        <div class="grid" id="gridA" aria-label="קלפי מעפילה"></div>
+      </section>
+
+      <div class="center" aria-hidden="true"></div>
+
+      <section class="side b" id="sideB">
+        <div class="grid" id="gridB" aria-label="קלפי מטפסת"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const CIRC = 2 * Math.PI * 45;
+      const HOT_RATIO = 0.15;   /* מתחת ל-15% מהזמן שנקצב — עוברים לאדום */
+      const CARD_COUNT = 16;
+      /* אייקוני הקלפים — מוגרלים מחדש בכל משחק */
+      const ICONS = [
+        "icon-snowman.png",
+        "icon-snowflake.png",
+        "icon-mittens.png",
+        "icon-igloo.png",
+        "icon-crystal.png",
+        "icon-drop.png",
+        "icon-wind.png",
+      ];
+
+      /**
+       * תוכן דמו — להחלפה בהמשך.
+       * sec = שניות לטיימר לכל שאלה/משימה
+       * type: 'oral' | 'trivia'
+       */
+      const BANK_A = [
+        { type: "trivia", sec: 15, q: "מה עושה טוב למורה דויטש?", choices: ["לשבת על שפת הים ולהסתכל על נפלאות הבריאה", "דיבור בצורה תקינה", "לשחק מול מצלמות באמצע הלילה במחנה", "כל התשובות נכונות"], correct: 0, a: "לשבת על שפת הים ולהסתכל על נפלאות הבריאה" },
+        { type: "trivia", sec: 12, q: "היכן כתוב: 'מה רב טובך אשר צפנת ליראיך'", choices: ["תהלים פרק לא", "תהלים פרק קיט", "תפילה של שב\"ק", "נביא ירמיהו"], correct: 0, a: "תהלים פרק לא" },
+        { type: "oral", sec: 10, q: "מה משותף בין רובינשטיין לטייטלבוים?", a: "" },
+        { type: "trivia", sec: 10, q: "מי אומרת הרבה 'כל טוּב וטוֹב'", choices: ["הסגנית", "המורה חיה ליכטנשטיין", "המורה גרוסברגר", "המורה שטרן"], correct: 0, a: "הסגנית" },
+        { type: "oral", sec: 12, q: "מה הטוב שבין: מירי טיטלבוים, גיטי טייטטלבוים, געננדי הרשקוביץ, מלכי טהלר", a: "" },
+        { type: "trivia", sec: 15, q: "מה עושה טוב למורה שטיינמץ?", choices: ["כל התשובות נכונות", "נסיעה לכותל", "נסיעה לקבר רחל", "להקשיב לקו ל'מען אמהות'"], correct: 0, a: "כל התשובות נכונות" },
+        { type: "trivia", sec: 8, q: "על מה נאמר 'טובה מאוד מאוד'", choices: ["הארץ", "הנשמה", "השבת", "כל התשובות נכונות"], correct: 0, a: "הארץ" },
+        { type: "oral", sec: 25, q: "צייני 3 המנונים שיש בהם את המילה טוב", a: "" },
+        { type: "oral", sec: 7, q: "בואי להעפיל אל הפסגה- יהיה טוב... בטוחה?", a: "" },
+        { type: "trivia", sec: 12, q: "מה טבו אהליך יעקב- מה הכוונה בפס'?", choices: ["כל התשובות נכונות", "נבואה על ישוב ארץ ישראל", "האוהלים שבמדבר", "בתי מדרשות"], correct: 0, a: "כל התשובות נכונות" },
+        { type: "trivia", sec: 8, q: "מה עושה טוב למורה ברגר?", choices: ["כל התשובות נכונות", "בית רגוע", "ילדים שמחים", "תלמידות מרוצות"], correct: 0, a: "כל התשובות נכונות" },
+        { type: "oral", sec: 8, q: "באיזה פרק בתהלים כתוב: 'אך טוב וחסד ירדפוני כל ימי חיי'", a: "" },
+        { type: "oral", sec: 10, q: "מה הקשר בין: לב, שם, טעם?", a: "" },
+        { type: "oral", sec: 8, q: "מצאי פס' שיש בו פעמיים את השורש ט.ו.ב", a: "" },
+        { type: "oral", sec: 15, q: "ספרי על 5 דברים טובים שקרו לך היום", a: "" },
+        { type: "oral", sec: 10, q: "מה עושה טוב לחברה מס 15 ביומן?", a: "" },
+      ];
+
+      const BANK_B = [
+        { type: "trivia", sec: 15, q: "מה עושה טוב למורה פיינשטיין?", choices: ["מוזיקה", "ספר קריאה טוב", "משחק עם הילדים", "כתיבה יפה"], correct: 0, a: "מוזיקה" },
+        { type: "trivia", sec: 10, q: "המילה 'טוב' מופיעה בתנ\"ך ביחס ל-2 איברים בלבד, איזה?", choices: ["עין ולב", "לב ופה", "אף ועין", "מוח ולב"], correct: 0, a: "עין ולב" },
+        { type: "oral", sec: 15, q: "אין טוב אלא תורה- צטטי שתי פסוקים", a: "" },
+        { type: "oral", sec: 12, q: "מה הטוב שבין: אסתר פרוינד, חנצי הומינר ופייגי פרל, חני שפיצר", a: "" },
+        { type: "oral", sec: 10, q: "מה הקשר בין: חוי שנייבוים, פיייג גלאנץ, שרי שנייבוים וצירי הומינר.", a: "" },
+        { type: "trivia", sec: 10, q: "באיזה עניין נאמר 'ושמחת בכל הטוב'?", choices: ["מצוות ביכורים", "השמח בחלקו", "חלק ונחלה בישוב הארץ", "עלייה לרגל"], correct: 0, a: "מצוות ביכורים" },
+        { type: "oral", sec: 10, q: "מה הקשר בין: המנהלת והמורה דויטש?", a: "" },
+        { type: "oral", sec: 20, q: "הביאי 10 שירים עם המילה טוב", a: "" },
+        { type: "oral", sec: 15, q: "מה הקשר בין: שפע, ילדה, כל, שכל", a: "" },
+        { type: "trivia", sec: 15, q: "מה עושה טוב למורה מלכי ליכשטנטיין?", choices: ["בית מסודר", "ילדים רגועים", "יום חופשי", "לפגוש תלמידה בגינה"], correct: 0, a: "בית מסודר" },
+        { type: "trivia", sec: 8, q: "כמה פעמים כתוב בתהלים מילים עם השורש ט.ו.ב.", choices: ["68", "89", "56", "73"], correct: 0, a: "68" },
+        { type: "trivia", sec: 10, q: "היכן כתוב 'טובים השניים מן האחד'", choices: ["קהלת", "משלי", "מגילת רות", "נביאים"], correct: 0, a: "קהלת" },
+        { type: "oral", sec: 20, q: "מצאי 5 ר\"ת למילה טוב", a: "" },
+        { type: "trivia", sec: 10, q: "מי אמר למי 'אנוכי טוב לך'", choices: ["אלקנה לחנה", "משה למרים", "אברהם לשרה", "אף תשובה אינה נכונה"], correct: 0, a: "אלקנה לחנה" },
+        { type: "trivia", sec: 10, q: "למי עושה טוב לראות בנות שמרגישות שטוב להם", choices: ["מנהלת", "הסגנית", "הרכזת", "היועצת"], correct: 0, a: "מנהלת" },
+        { type: "oral", sec: 15, q: "מה הקשר בין 'טוב' לחברת אוטובוסים?", a: "" },
+      ];
+
+      const el = (id) => document.getElementById(id);
+
+      const GRID = 4;
+      const WIN_LINES = (function () {
+        const lines = [];
+        for (let r = 0; r < GRID; r++) lines.push([0, 1, 2, 3].map((c) => r * GRID + c));
+        for (let c = 0; c < GRID; c++) lines.push([0, 1, 2, 3].map((r) => r * GRID + c));
+        lines.push([0, 5, 10, 15], [3, 6, 9, 12]);
+        return lines;
+      })();
+
+      const state = {
+        started: false,
+        muted: false,
+        active: null,
+        phase: "board",
+        timer: null,
+        timeLeft: 20,
+        timerMax: 20,
+        answered: false,
+        winnerShown: false,
+        winLine: { a: null, b: null },
+        boards: { a: [], b: [] },
+      };
+
+      let audioCtx = null;
+
+      /* צליל ההצלחה הוא קובץ, לא צלילים מסונתזים */
+      const okSound = new Audio("sfx-success.mp3");
+      okSound.preload = "auto";
+      okSound.volume = 0.85;
+
+      const flipSound = new Audio("sfx-flip.mp3");
+      flipSound.preload = "auto";
+      flipSound.volume = 0.7;
+
+      const failSound = new Audio("sfx-fail.mp3");
+      failSound.preload = "auto";
+      failSound.volume = 0.85;
+
+      const startSound = new Audio("sfx-start.mp3");
+      startSound.preload = "auto";
+      startSound.volume = 0.8;
+
+      /* ניצחון: פנפרה, ומחיאות הכפיים נכנסות לקראת סופה */
+      const winSound = new Audio("sfx-victory.mp3");
+      winSound.preload = "auto";
+      winSound.volume = 0.9;
+
+      const applauseSound = new Audio("sfx-applause.mp3");
+      applauseSound.preload = "auto";
+      applauseSound.volume = 0.75;
+
+      /* הפנפרה נמשכת 7.65 שניות — המחיאות נכנסות כ-2.4 שניות לפני סופה */
+      const APPLAUSE_DELAY_MS = 5200;
+      let applauseTimer = null;
+
+      function stopVictorySound() {
+        clearTimeout(applauseTimer);
+        applauseTimer = null;
+        [winSound, applauseSound].forEach((a) => {
+          try { a.pause(); a.currentTime = 0; } catch (e) { /* ignore */ }
+        });
+      }
+
+      function playSample(a) {
+        if (state.muted || !a) return;
+        try {
+          a.currentTime = 0;
+          const r = a.play();
+          if (r && r.catch) r.catch(() => {});
+        } catch (e) { /* הדפדפן חסם — ממשיכים בשקט */ }
+      }
+
+      function ensureAudio() {
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          audioCtx = new AC();
+        }
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        return audioCtx;
+      }
+
+      function tone(freq, dur, type, gain, when) {
+        if (state.muted) return;
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const t0 = (when || 0) + ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = type || "sine";
+        osc.frequency.setValueAtTime(freq, t0);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(gain || 0.12, t0 + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(g);
+        g.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+      }
+
+      const SFX = {
+        start() {
+          playSample(startSound);
+        },
+        flip() {
+          playSample(flipSound);
+        },
+        /* פתיחת כרטיס משתמשת באותו צליל של תחילת המשחק */
+        open() {
+          playSample(startSound);
+        },
+        tick(n, stress) {
+          const freq = stress ? 1100 + Math.max(0, 5 - n) * 80 : 880;
+          tone(freq, stress ? 0.07 : 0.045, "square", stress ? 0.09 : 0.045);
+          if (stress) tone(freq * 1.5, 0.05, "square", 0.04, 0.05);
+        },
+        ok() {
+          playSample(okSound);
+        },
+        bad() {
+          playSample(failSound);
+        },
+        applause() {
+          stopVictorySound();
+          playSample(winSound);
+          applauseTimer = setTimeout(() => {
+            applauseTimer = null;
+            playSample(applauseSound);
+          }, APPLAUSE_DELAY_MS);
+        },
+        timeout() {
+          tone(280, 0.4, "triangle", 0.1);
+        },
+      };
+
+      /* Snow */
+      const snowCanvas = el("snow");
+      const snowCtx = snowCanvas.getContext("2d");
+      let flakes = [];
+
+      function resizeSnow() {
+        snowCanvas.width = innerWidth;
+        snowCanvas.height = innerHeight;
+      }
+
+      function initSnow() {
+        resizeSnow();
+        flakes = [];
+        const count = Math.min(90, Math.floor((innerWidth * innerHeight) / 18000));
+        for (let i = 0; i < count; i++) {
+          flakes.push({
+            x: Math.random() * snowCanvas.width,
+            y: Math.random() * snowCanvas.height,
+            r: 1.2 + Math.random() * 3.2,
+            vy: 0.4 + Math.random() * 1.4,
+            vx: -0.3 + Math.random() * 0.6,
+            a: 0.35 + Math.random() * 0.5,
+          });
+        }
+      }
+
+      function drawSnow() {
+        snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+        for (const f of flakes) {
+          f.y += f.vy;
+          f.x += f.vx + Math.sin(f.y * 0.01) * 0.3;
+          if (f.y > snowCanvas.height + 4) {
+            f.y = -4;
+            f.x = Math.random() * snowCanvas.width;
+          }
+          if (f.x < -4) f.x = snowCanvas.width + 4;
+          if (f.x > snowCanvas.width + 4) f.x = -4;
+          snowCtx.beginPath();
+          snowCtx.fillStyle = "rgba(255,255,255," + f.a + ")";
+          snowCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+          snowCtx.fill();
+        }
+        requestAnimationFrame(drawSnow);
+      }
+
+      addEventListener("resize", () => {
+        resizeSnow();
+        initSnow();
+      });
+      initSnow();
+      drawSnow();
+
+      /* Confetti */
+      const canvas = el("confetti");
+      const c2d = canvas.getContext("2d");
+      let bits = [];
+      let raf = 0;
+      let cw = 0;
+      let ch = 0;
+
+      /* אותם כוכבי זהב־קרח שמופיעים על קלף שנפתר, חתוכים מתוך star-badge.png */
+      const starImg = new Image();
+      starImg.src = "star-particle.png";
+      const sparkleImg = new Image();
+      sparkleImg.src = "sparkle-particle.png";
+
+      const calmMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+      function resizeCanvas() {
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        cw = innerWidth;
+        ch = innerHeight;
+        canvas.width = Math.round(cw * dpr);
+        canvas.height = Math.round(ch * dpr);
+        /* עובדים ביחידות CSS — הכוכבים נשארים חדים גם במסך רטינה */
+        c2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      function burstConfetti(mega) {
+        const colors = ["#ffffff", "#7dd3fc", "#1a7ab8", "#fbbf24", "#0ea5c6", "#5b7cfa", "#86efac"];
+        const count = mega ? 200 : 80;
+        const sources = mega
+          ? [
+              [cw * 0.5, ch * 0.35],
+              [cw * 0.22, ch * 0.42],
+              [cw * 0.78, ch * 0.42],
+            ]
+          : [[cw / 2, ch * 0.35]];
+
+        for (let s = 0; s < sources.length; s++) {
+          for (let i = 0; i < count / sources.length; i++) {
+            bits.push({
+              x: sources[s][0] + (Math.random() - 0.5) * 80,
+              y: sources[s][1],
+              vx: (Math.random() - 0.5) * (mega ? 20 : 12),
+              vy: -4 - Math.random() * (mega ? 15 : 11),
+              g: 0.26 + Math.random() * 0.14,
+              w: 5 + Math.random() * (mega ? 9 : 6),
+              h: 3 + Math.random() * 6,
+              rot: Math.random() * Math.PI,
+              vr: (Math.random() - 0.5) * 0.35,
+              color: colors[(Math.random() * colors.length) | 0],
+              life: (mega ? 100 : 75) + ((Math.random() * 45) | 0),
+            });
+          }
+        }
+        if (!raf) loopConfetti();
+      }
+
+      /* מטר כוכבים שנשאר בתחומו של הכרטיס הפתוח — חגיגת תשובה נכונה.
+         rect הוא תיבת האלמנט; הכוכבים נולדים בתוכה ונדחפים החוצה רק עד שוליה */
+      function burstStars(rect, power) {
+        if (calmMotion.matches) return;
+        const p = power || 1;
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const rx = rect.width * 0.5;
+        const ry = rect.height * 0.5;
+        /* גרר חזק חוסם את הטווח: התזוזה הכוללת = v0 * drag / (1 - drag),
+           ולכן מהירות ההתחלה נגזרת מהתזוזה הרצויה — חצי כרטיס לכל היותר */
+        const drag = 0.9;
+        const toV0 = (1 - drag) / drag;
+        const count = Math.round(34 * p);
+
+        for (let i = 0; i < count; i++) {
+          /* כל חלקיק שלישי הוא נצנוץ קטן, כמו אלה שסביב הכוכב שעל הקלף */
+          const spark = i % 3 === 2;
+          /* יעד אקראי על אליפסה חסומה בתוך הכרטיס */
+          const a = Math.random() * Math.PI * 2;
+          const spread = 0.45 + Math.random() * 0.55;
+          const dx = Math.cos(a) * rx * spread;
+          const dy = Math.sin(a) * ry * spread;
+          const size = spark ? (12 + Math.random() * 12) * p : (19 + Math.random() * 20) * p;
+          bits.push({
+            img: spark ? sparkleImg : starImg,
+            spark: spark,
+            /* נולדים קרוב למרכז הכרטיס ונפרשים משם אל שוליו */
+            x: cx + dx * 0.18,
+            y: cy + dy * 0.18,
+            vx: dx * 0.82 * toV0,
+            vy: dy * 0.82 * toV0,
+            g: spark ? 0.015 + Math.random() * 0.02 : 0.03 + Math.random() * 0.035,
+            drag: drag,
+            w: spark ? size * 0.76 : size,
+            h: size,
+            rot: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * (spark ? 0.1 : 0.22),
+            phase: Math.random() * Math.PI * 2,
+            life: 48 + ((Math.random() * 28) | 0),
+          });
+        }
+        if (!raf) loopConfetti();
+      }
+
+      function loopConfetti() {
+        c2d.clearRect(0, 0, cw, ch);
+        bits = bits.filter((p) => p.life > 0);
+        for (const p of bits) {
+          p.vy += p.g;
+          if (p.drag) {
+            p.vx *= p.drag;
+            p.vy *= p.drag;
+          }
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vr;
+          p.life--;
+          c2d.save();
+          c2d.translate(p.x, p.y);
+          c2d.rotate(p.rot);
+          let alpha = Math.min(1, p.life / 25);
+          if (p.spark) alpha *= 0.55 + 0.45 * Math.sin((p.phase += 0.25));
+          c2d.globalAlpha = Math.max(0, alpha);
+          if (p.img) {
+            if (p.img.complete) c2d.drawImage(p.img, -p.w / 2, -p.h / 2, p.w, p.h);
+          } else {
+            c2d.fillStyle = p.color;
+            c2d.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          }
+          c2d.restore();
+        }
+        if (bits.length) raf = requestAnimationFrame(loopConfetti);
+        else {
+          raf = 0;
+          c2d.clearRect(0, 0, cw, ch);
+        }
+      }
+
+      function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = (Math.random() * (i + 1)) | 0;
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      /* מחלק את האייקונים באופן אקראי אך מאוזן: כל אייקון חוזר מספר דומה של פעמים */
+      function dealIcons(count) {
+        const out = [];
+        while (out.length < count) out.push(...shuffle(ICONS));
+        return shuffle(out.slice(0, count));
+      }
+
+      function buildBoard(team) {
+        const pool = shuffle(team === "a" ? BANK_A : BANK_B).slice(0, CARD_COUNT);
+        const icons = dealIcons(CARD_COUNT);
+        state.boards[team] = pool.map((q, i) => {
+          const card = {
+            id: i,
+            q,
+            icon: icons[i],
+            solved: false,
+            open: false,
+          };
+          if (q.choices) {
+            // shuffle the options once per card so the correct one isn't always first
+            const order = shuffle(q.choices.map((text, idx) => ({ text, idx })));
+            card.choices = order.map((o) => o.text);
+            card.correctIndex = order.findIndex((o) => o.idx === q.correct);
+          }
+          return card;
+        });
+      }
+
+      function findWinLine(team) {
+        const board = state.boards[team];
+        for (let i = 0; i < WIN_LINES.length; i++) {
+          const line = WIN_LINES[i];
+          if (line.every((idx) => board[idx] && board[idx].solved)) return line;
+        }
+        return null;
+      }
+
+      function renderGrid(team) {
+        const grid = el(team === "a" ? "gridA" : "gridB");
+        grid.innerHTML = "";
+        const winLine = state.winLine[team];
+        state.boards[team].forEach((card, index) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "card";
+          btn.dataset.team = team;
+          btn.dataset.index = String(index);
+          if (card.solved) btn.classList.add("solved", "open");
+          else if (card.open) btn.classList.add("open");
+          if (winLine && winLine.indexOf(index) !== -1) btn.classList.add("win-line");
+
+          const front = card.solved
+            ? '<img class="icon" src="star-badge.png" alt="" />'
+            : '<span class="mark">\u2744\uFE0F</span>';
+          btn.innerHTML =
+            '<div class="card-inner">' +
+            '<div class="face back"><img class="icon" src="' + card.icon + '" alt="" /></div>' +
+            '<div class="face front">' + front + "</div>" +
+            "</div>";
+
+          btn.disabled = !(state.started && state.phase === "board" && !card.solved);
+          btn.addEventListener("click", () => openCard(team, index));
+          grid.appendChild(btn);
+        });
+        updateProgress();
+      }
+
+      function renderAll() {
+        renderGrid("a");
+        renderGrid("b");
+      }
+
+      function solvedCount(team) {
+        return state.boards[team].filter((c) => c.solved).length;
+      }
+
+      function updateProgress() {
+        // counters removed from the UI; kept as a no-op hook for callers
+      }
+
+      function teamName(t) {
+        return t === "a" ? "מעפילה" : "מטפסת";
+      }
+
+      function setTimerVisual(sec) {
+        const root = el("timer");
+        const dock = el("timerDock");
+        const running = sec != null && state.phase === "question";
+        const urgent = running && sec <= state.timerMax * HOT_RATIO;
+
+        dock.classList.toggle("visible", running);
+        dock.setAttribute("aria-hidden", running ? "false" : "true");
+        root.classList.toggle("running", running && !urgent);
+        root.classList.toggle("urgent", !!urgent);
+
+        if (!running) {
+          el("timerNum").textContent = "—";
+          el("timerLabel").textContent = "זמן";
+          el("timerArc").style.strokeDashoffset = "0";
+          return;
+        }
+
+        const shown = Math.max(0, Math.ceil(sec));
+        const num = el("timerNum");
+        if (num.dataset.last !== String(shown)) {
+          num.dataset.last = String(shown);
+          num.textContent = String(shown);
+          num.classList.remove("pop");
+          void num.offsetWidth;
+          num.classList.add("pop");
+        } else {
+          num.textContent = String(shown);
+        }
+        el("timerLabel").textContent = urgent ? "מהר!" : "שניות";
+        const pct = Math.max(0, sec / state.timerMax);
+        el("timerArc").style.strokeDasharray = String(CIRC);
+        el("timerArc").style.strokeDashoffset = String(CIRC * (1 - pct));
+      }
+
+      function isHot(sec) {
+        return sec <= state.timerMax * HOT_RATIO;
+      }
+
+      function stopTimer() {
+        if (state.timer) {
+          clearInterval(state.timer);
+          state.timer = null;
+        }
+      }
+
+      function startTimer(seconds) {
+        stopTimer();
+        state.timerMax = Math.max(1, seconds || 20);
+        state.timeLeft = state.timerMax;
+        el("timerNum").dataset.last = "";
+        setTimerVisual(state.timeLeft);
+        let lastWhole = Math.ceil(state.timeLeft);
+        SFX.tick(lastWhole, isHot(state.timeLeft));
+
+        state.timer = setInterval(() => {
+          state.timeLeft -= 0.1;
+          setTimerVisual(state.timeLeft);
+          const whole = Math.ceil(state.timeLeft);
+          if (whole !== lastWhole && whole >= 0) {
+            lastWhole = whole;
+            if (whole > 0) SFX.tick(whole, isHot(state.timeLeft));
+          }
+          if (state.timeLeft <= 0) {
+            stopTimer();
+            state.timeLeft = 0;
+            setTimerVisual(0);
+            onTimeout();
+          }
+        }, 100);
+      }
+
+      function openCard(team, index) {
+        if (!state.started || state.phase !== "board") return;
+        const card = state.boards[team][index];
+        if (!card || card.solved) return;
+
+        card.open = true;
+        state.active = { team, index };
+        state.phase = "question";
+        state.answered = false;
+        SFX.open();
+        renderAll();
+
+        const node = document.querySelector(
+          '.card[data-team="' + team + '"][data-index="' + index + '"]'
+        );
+        if (node) {
+          node.classList.add("pulse");
+          setTimeout(() => node.classList.remove("pulse"), 600);
+        }
+
+        showQuestion(card, team, index);
+        startTimer(card.q.sec || 20);
+      }
+
+      function showQuestion(card, team, index) {
+        const q = card.q;
+        const panel = document.querySelector(".modal-card");
+        if (panel) panel.classList.remove("seal-ok", "seal-bad");
+        el("qText").textContent = q.q;
+
+        const body = el("qBody");
+        if (card.choices) {
+          body.innerHTML =
+            '<ul class="choices">' +
+            card.choices
+              .map(
+                (text, i) =>
+                  '<li><button type="button" class="choice" data-i="' + i + '">' +
+                  '<span class="choice-key">' + "אבגד".charAt(i) + "</span>" +
+                  '<span class="choice-text"></span>' +
+                  "</button></li>"
+              )
+              .join("") +
+            "</ul>";
+          // set the text as text, never as markup
+          body.querySelectorAll(".choice").forEach((node, i) => {
+            node.querySelector(".choice-text").textContent = card.choices[i];
+            node.addEventListener("click", () => pickChoice(card, i));
+          });
+          // a multiple-choice answer judges itself, so no verdict buttons
+          el("judgeRow").style.display = "none";
+        } else {
+          body.innerHTML = "";
+          el("judgeRow").style.display = "flex";
+          el("btnCorrect").disabled = false;
+          el("btnWrong").disabled = false;
+        }
+
+        el("qModal").classList.add("show");
+        document.body.classList.remove("asking-a", "asking-b");
+        document.body.classList.add("asking", "asking-" + team);
+      }
+
+      function pickChoice(card, i) {
+        if (state.answered || !state.active) return;
+        const node = document.querySelector('.choice[data-i="' + i + '"]');
+        const right = i === card.correctIndex;
+        if (node) node.classList.add(right ? "is-correct" : "is-wrong");
+        const list = document.querySelector(".choices");
+        if (list) list.classList.add("locked");
+        finishAttempt(right);
+      }
+
+      function finishAttempt(ok) {
+        if (state.answered || !state.active) return;
+        state.answered = true;
+        stopTimer();
+
+        const { team, index } = state.active;
+        const card = state.boards[team][index];
+
+        if (typeof card.correctIndex === "number") {
+          // only a right answer reveals the solution — a miss leaves the question
+          // unspoiled so it still works as a puzzle next time
+          if (ok) {
+            const node = document.querySelector('.choice[data-i="' + card.correctIndex + '"]');
+            if (node) node.classList.add("is-correct");
+          }
+          const list = document.querySelector(".choices");
+          if (list) list.classList.add("locked");
+        }
+
+        if (ok) {
+          card.solved = true;
+          card.open = true;
+          SFX.ok();
+          sealModal("ok");
+          starsFrom(document.querySelector(".modal-card"), 1);
+        } else {
+          card.solved = false;
+          card.open = false;
+          SFX.bad();
+          sealModal("bad");
+        }
+
+        setTimeout(() => {
+          closeModal();
+          state.phase = "board";
+          state.active = null;
+          setTimerVisual(null);
+          renderAll();
+          if (ok) {
+            const node = document.querySelector(
+              '.card[data-team="' + team + '"][data-index="' + index + '"]'
+            );
+            if (node) {
+              node.classList.add("just-won");
+              /* התפרצות שנייה, קטנה — יוצאת מהקלף שזה עתה זכה בכוכב */
+              starsFrom(node, 0.55);
+              node.addEventListener("animationend", function off() {
+                node.classList.remove("just-won");
+                node.removeEventListener("animationend", off);
+              });
+            }
+          }
+          checkVictory(team, ok);
+        }, ok ? 1050 : 1100);
+      }
+
+      function onTimeout() {
+        if (state.answered || !state.active) return;
+        SFX.timeout();
+        finishAttempt(false);
+      }
+
+      /* שולח את מטר הכוכבים אל תוך תיבת האלמנט הנתון */
+      function starsFrom(node, power) {
+        if (!node) return;
+        const r = node.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        burstStars(r, power);
+      }
+
+      /* מריץ על כרטיס השאלה את אנימציית הסגירה המתאימה לפסיקה */
+      function sealModal(kind) {
+        const card = document.querySelector(".modal-card");
+        if (!card) return;
+        card.classList.remove("seal-ok", "seal-bad");
+        void card.offsetWidth;
+        card.classList.add("seal-" + kind);
+      }
+
+      function closeModal() {
+        el("qModal").classList.remove("show");
+        document.body.classList.remove("asking", "asking-a", "asking-b");
+      }
+
+      function hideVictoryFx() {
+        stopVictorySound();
+        const v = el("victory");
+        v.classList.add("hidden");
+        v.classList.remove("team-a", "team-b");
+        document.body.classList.remove("won-a", "won-b");
+        v.setAttribute("aria-hidden", "true");
+      }
+
+      function celebrateVictory(team) {
+        const v = el("victory");
+        el("victoryText").textContent = "ארבעה ברצף — ניצחון!";
+        document.body.classList.remove("won-a", "won-b");
+        document.body.classList.add("won-" + team);
+        v.classList.remove("hidden", "team-a", "team-b");
+        v.classList.add("team-" + team);
+        v.setAttribute("aria-hidden", "false");
+        const burst = v.querySelector(".victory-burst");
+        if (burst) {
+          burst.style.animation = "none";
+          void burst.offsetWidth;
+          burst.style.animation = "";
+        }
+        SFX.applause();
+        burstConfetti(true);
+        setTimeout(() => burstConfetti(true), 350);
+      }
+
+      function checkVictory(lastTeam, wasCorrect) {
+        if (!wasCorrect) return;
+        const line = findWinLine(lastTeam);
+        if (!line) return;
+        state.winLine[lastTeam] = line;
+        renderAll();
+        if (state.winnerShown) return;
+        state.winnerShown = true;
+        celebrateVictory(lastTeam);
+      }
+
+      el("btnStart").addEventListener("click", () => {
+        ensureAudio();
+        buildBoard("a");
+        buildBoard("b");
+        state.started = true;
+        state.winnerShown = false;
+        state.winLine = { a: null, b: null };
+        hideVictoryFx();
+        el("intro").classList.add("hidden");
+        SFX.start();
+        renderAll();
+      });
+
+      el("btnContinue").addEventListener("click", () => {
+        hideVictoryFx();
+        SFX.flip();
+      });
+
+      el("btnCorrect").addEventListener("click", () => finishAttempt(true));
+      el("btnWrong").addEventListener("click", () => finishAttempt(false));
+
+      document.addEventListener("keydown", (e) => {
+        if (!state.started && (e.code === "Space" || e.key === "Enter")) {
+          e.preventDefault();
+          el("btnStart").click();
+          return;
+        }
+        if (!state.started) return;
+
+        if (e.key === "f" || e.key === "F") {
+          if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+          else document.exitFullscreen?.();
+          return;
+        }
+        if (e.key === "m" || e.key === "M") {
+          state.muted = !state.muted;
+          if (state.muted) stopVictorySound();
+          return;
+        }
+
+        if (state.phase === "question" && state.active) {
+          if (e.key === "1") {
+            e.preventDefault();
+            finishAttempt(true);
+          } else if (e.key === "0") {
+            e.preventDefault();
+            finishAttempt(false);
+          }
+        }
+      });
+
+      (function initTicks() {
+        const ticks = el("timerTicks");
+        if (!ticks) return;
+        const r = 38;
+        const c = 2 * Math.PI * r;
+        const n = 24;
+        const dash = c / n / 6;
+        const gap = c / n - dash;
+        ticks.setAttribute("stroke-dasharray", dash + " " + gap);
+      })();
+
+      el("timerArc").style.strokeDasharray = String(CIRC);
+      setTimerVisual(null);
+    })();
+  </script>
+</body>
+</html>
