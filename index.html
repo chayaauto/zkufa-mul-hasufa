@@ -798,6 +798,14 @@
       pointer-events: none;
     }
 
+    #victorySnow {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
     .victory-burst {
       position: absolute;
       inset: 0;
@@ -819,16 +827,32 @@
       100% { opacity: 0.25; transform: scale(1.25); }
     }
 
+    .victory-fx:not(.hidden) {
+      background: rgba(4, 14, 28, 0.72);
+    }
+
+    /* the trophy art is the whole card; the text sits inside its ice panel */
     .victory-inner {
       position: relative;
+      container-type: inline-size;
+      width: min(92vw, 128vh);
+      aspect-ratio: 3 / 2;
       text-align: center;
-      padding: 32px 44px;
-      border-radius: 28px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(26, 122, 184, 0.3);
-      box-shadow: 0 20px 60px rgba(26, 80, 120, 0.2);
+      background: url("victory-bg.png") center / 100% 100% no-repeat;
       animation: victoryPop 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-      max-width: 90vw;
+    }
+
+    .victory-panel {
+      position: absolute;
+      top: 50%;
+      bottom: 13%;
+      left: 12%;
+      right: 12%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4cqw;
     }
 
     @keyframes victoryPop {
@@ -836,23 +860,17 @@
       to { opacity: 1; transform: none; }
     }
 
-    .victory-crown {
-      font-size: clamp(2.4rem, 6vw, 3.6rem);
-      margin-bottom: 8px;
-      animation: crownSpin 1.2s ease-in-out infinite;
-      filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
-    }
-
-    @keyframes crownSpin {
-      0%, 100% { transform: scale(1) rotate(-6deg); }
-      50% { transform: scale(1.12) rotate(6deg); }
-    }
-
     .victory-fx p {
-      color: var(--accent);
-      font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+      color: #0b3f66;
+      font-size: 6cqw;
       font-weight: 800;
-      margin-bottom: 22px;
+      line-height: 1.2;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 14px rgba(255, 255, 255, 0.8);
+    }
+
+    .victory-actions .primary {
+      font-size: 2.4cqw;
+      padding: 1cqw 3.2cqw;
     }
 
     .victory-actions {
@@ -1013,7 +1031,7 @@
     .choices {
       list-style: none;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       gap: clamp(6px, 0.9vw, 12px);
       margin: 0 0 14px;
       text-align: right;
@@ -1085,10 +1103,6 @@
     .choice.is-correct .choice-key {
       background: #15a349;
       color: #fff;
-    }
-
-    @media (max-width: 760px) {
-      .choices { grid-template-columns: minmax(0, 1fr); }
     }
 
     .judge-row {
@@ -1209,11 +1223,13 @@
 
   <div class="victory-fx hidden" id="victory" aria-hidden="true">
     <div class="victory-burst" aria-hidden="true"></div>
+    <canvas id="victorySnow" aria-hidden="true"></canvas>
     <div class="victory-inner">
-      <div class="victory-crown">🏆</div>
-      <p id="victoryText">ארבעה ברצף</p>
-      <div class="victory-actions">
-        <button type="button" class="primary" id="btnContinue">המשך משחק</button>
+      <div class="victory-panel">
+        <p id="victoryText">ארבעה ברצף</p>
+        <div class="victory-actions">
+          <button type="button" class="primary" id="btnContinue">המשך משחק</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1447,6 +1463,9 @@
         osc.stop(t0 + dur + 0.02);
       }
 
+      /* עוצמת טיקים של הטיימר — 1 היא העוצמה המקורית */
+      const TICK_VOLUME = 3;
+
       const SFX = {
         start() {
           playSample(startSound);
@@ -1460,8 +1479,8 @@
         },
         tick(n, stress) {
           const freq = stress ? 1100 + Math.max(0, 5 - n) * 80 : 880;
-          tone(freq, stress ? 0.07 : 0.045, "square", stress ? 0.09 : 0.045);
-          if (stress) tone(freq * 1.5, 0.05, "square", 0.04, 0.05);
+          tone(freq, stress ? 0.07 : 0.045, "square", (stress ? 0.09 : 0.045) * TICK_VOLUME);
+          if (stress) tone(freq * 1.5, 0.05, "square", 0.04 * TICK_VOLUME, 0.05);
         },
         ok() {
           playSample(okSound);
@@ -1542,12 +1561,6 @@
       let cw = 0;
       let ch = 0;
 
-      /* אותם כוכבי זהב־קרח שמופיעים על קלף שנפתר, חתוכים מתוך star-badge.png */
-      const starImg = new Image();
-      starImg.src = "star-particle.png";
-      const sparkleImg = new Image();
-      sparkleImg.src = "sparkle-particle.png";
-
       const calmMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
       function resizeCanvas() {
@@ -1593,46 +1606,49 @@
         if (!raf) loopConfetti();
       }
 
-      /* מטר כוכבים שנשאר בתחומו של הכרטיס הפתוח — חגיגת תשובה נכונה.
-         rect הוא תיבת האלמנט; הכוכבים נולדים בתוכה ונדחפים החוצה רק עד שוליה */
-      function burstStars(rect, power) {
+      /* טבעת פתיתי שלג שמתפרצת סביב כרטיס השאלה הפתוח — חגיגת תשובה נכונה.
+         הפתיתים נולדים על שולי הכרטיס, נדחפים מעט החוצה, נעצרים ודועכים במקום,
+         כך שהחגיגה נשארת צמודה לכרטיס ולא מכסה את הטקסט שבו */
+      function burstFlakes(rect) {
         if (calmMotion.matches) return;
-        const p = power || 1;
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
         const rx = rect.width * 0.5;
         const ry = rect.height * 0.5;
         /* גרר חזק חוסם את הטווח: התזוזה הכוללת = v0 * drag / (1 - drag),
-           ולכן מהירות ההתחלה נגזרת מהתזוזה הרצויה — חצי כרטיס לכל היותר */
-        const drag = 0.9;
+           ולכן מהירות ההתחלה נגזרת מהמרחק הרצוי מהקלף */
+        const drag = 0.88;
         const toV0 = (1 - drag) / drag;
-        const count = Math.round(34 * p);
+        const count = 26;
+        /* גודל הפתיתים והמרחק נגזרים מגודל הכרטיס, עם תקרה כדי שלא יתנפחו */
+        const base = Math.min(rect.width, rect.height, 200);
 
         for (let i = 0; i < count; i++) {
-          /* כל חלקיק שלישי הוא נצנוץ קטן, כמו אלה שסביב הכוכב שעל הקלף */
+          /* כל חלקיק שלישי הוא פתית זעיר ומנצנץ */
           const spark = i % 3 === 2;
-          /* יעד אקראי על אליפסה חסומה בתוך הכרטיס */
-          const a = Math.random() * Math.PI * 2;
-          const spread = 0.45 + Math.random() * 0.55;
-          const dx = Math.cos(a) * rx * spread;
-          const dy = Math.sin(a) * ry * spread;
-          const size = spark ? (12 + Math.random() * 12) * p : (19 + Math.random() * 20) * p;
+          /* זוויות פרושות באופן שווה סביב הקלף, עם מעט אקראיות */
+          const a = ((i + Math.random() * 0.6) / count) * Math.PI * 2;
+          const ux = Math.cos(a);
+          const uy = Math.sin(a);
+          /* נקודת היציאה היא שפת המלבן בכיוון הזה, לא בתוכו */
+          const edge = Math.min(rx / Math.max(Math.abs(ux), 1e-6), ry / Math.max(Math.abs(uy), 1e-6));
+          const dist = base * (0.3 + Math.random() * 0.4);
+          const size = base * (spark ? 0.14 + Math.random() * 0.06 : 0.24 + Math.random() * 0.12);
           bits.push({
-            img: spark ? sparkleImg : starImg,
+            img: answerFlakeSprites[(Math.random() * answerFlakeSprites.length) | 0],
             spark: spark,
-            /* נולדים קרוב למרכז הכרטיס ונפרשים משם אל שוליו */
-            x: cx + dx * 0.18,
-            y: cy + dy * 0.18,
-            vx: dx * 0.82 * toV0,
-            vy: dy * 0.82 * toV0,
-            g: spark ? 0.015 + Math.random() * 0.02 : 0.03 + Math.random() * 0.035,
+            x: cx + ux * edge,
+            y: cy + uy * edge,
+            vx: ux * dist * toV0,
+            vy: uy * dist * toV0,
+            g: 0,
             drag: drag,
-            w: spark ? size * 0.76 : size,
+            w: size,
             h: size,
             rot: Math.random() * Math.PI * 2,
-            vr: (Math.random() - 0.5) * (spark ? 0.1 : 0.22),
+            vr: (Math.random() - 0.5) * 0.16,
             phase: Math.random() * Math.PI * 2,
-            life: 48 + ((Math.random() * 28) | 0),
+            life: 75 + ((Math.random() * 25) | 0),
           });
         }
         if (!raf) loopConfetti();
@@ -1658,7 +1674,7 @@
           if (p.spark) alpha *= 0.55 + 0.45 * Math.sin((p.phase += 0.25));
           c2d.globalAlpha = Math.max(0, alpha);
           if (p.img) {
-            if (p.img.complete) c2d.drawImage(p.img, -p.w / 2, -p.h / 2, p.w, p.h);
+            c2d.drawImage(p.img, -p.w / 2, -p.h / 2, p.w, p.h);
           } else {
             c2d.fillStyle = p.color;
             c2d.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
@@ -1670,6 +1686,141 @@
           raf = 0;
           c2d.clearRect(0, 0, cw, ch);
         }
+      }
+
+      /* סערת פתיתים מאחורי מסך הניצחון: פיצוץ מאחורי הגביע, תותחי שלג מהפינות
+         ומטר שלג שלא נגמר כל עוד המסך פתוח */
+      const vCanvas = el("victorySnow");
+      const vCtx = vCanvas.getContext("2d");
+      let vFlakes = [];
+      let vRaf = 0;
+      let vCannonTimer = 0;
+      let vw = 0;
+      let vh = 0;
+
+      /* פתית בעל שש זרועות, מצויר פעם אחת לכל צבע ומשוכפל בציור */
+      function makeFlakeSprite(color) {
+        const size = 64;
+        const c = document.createElement("canvas");
+        c.width = c.height = size;
+        const g = c.getContext("2d");
+        g.translate(size / 2, size / 2);
+        g.strokeStyle = color;
+        g.lineCap = "round";
+        g.lineWidth = 3;
+        g.shadowColor = color;
+        g.shadowBlur = 6;
+        for (let i = 0; i < 6; i++) {
+          g.rotate(Math.PI / 3);
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.lineTo(0, -22);
+          g.moveTo(0, -10);
+          g.lineTo(-6, -16);
+          g.moveTo(0, -10);
+          g.lineTo(6, -16);
+          g.moveTo(0, -17);
+          g.lineTo(-4, -21);
+          g.moveTo(0, -17);
+          g.lineTo(4, -21);
+          g.stroke();
+        }
+        return c;
+      }
+      const flakeSprites = ["#ffffff", "#ffffff", "#bae6fd", "#7dd3fc", "#fde68a"].map(makeFlakeSprite);
+      /* לכרטיס הבהיר צריך פתיתים בצבעים עמוקים יותר, אחרת הם נבלעים בו */
+      const answerFlakeSprites = ["#38bdf8", "#0ea5e9", "#1a7ab8", "#7dd3fc", "#fbbf24"].map(makeFlakeSprite);
+
+      function resizeVictorySnow() {
+        const dpr = Math.min(devicePixelRatio || 1, 2);
+        vw = innerWidth;
+        vh = innerHeight;
+        vCanvas.width = Math.round(vw * dpr);
+        vCanvas.height = Math.round(vh * dpr);
+        vCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      addEventListener("resize", () => {
+        if (vRaf) resizeVictorySnow();
+      });
+
+      function addVictoryFlake(x, y, vx, vy) {
+        vFlakes.push({
+          x: x,
+          y: y,
+          vx: vx,
+          vy: vy,
+          size: 10 + Math.random() * 28,
+          rot: Math.random() * Math.PI * 2,
+          vr: (Math.random() - 0.5) * 0.14,
+          sway: Math.random() * Math.PI * 2,
+          a: 0.7 + Math.random() * 0.3,
+          sprite: flakeSprites[(Math.random() * flakeSprites.length) | 0],
+        });
+      }
+
+      /* פיצוץ לכל הכיוונים מנקודה אחת */
+      function flakeBurst(x, y, count, speed) {
+        for (let i = 0; i < count; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const v = speed * (0.3 + Math.random() * 0.7);
+          addVictoryFlake(x, y, Math.cos(a) * v, Math.sin(a) * v - 2);
+        }
+      }
+
+      /* תותח שלג מפינה תחתונה, יורה באלכסון אל מרכז המסך */
+      function flakeCannon(fromLeft, count) {
+        const dir = fromLeft ? 1 : -1;
+        for (let i = 0; i < count; i++) {
+          const a = (55 + Math.random() * 25) * (Math.PI / 180);
+          const v = 14 + Math.random() * 10;
+          addVictoryFlake(fromLeft ? -10 : vw + 10, vh + 10, Math.cos(a) * v * dir, -Math.sin(a) * v);
+        }
+      }
+
+      function loopVictorySnow() {
+        vCtx.clearRect(0, 0, vw, vh);
+        /* מטר שלג קבוע מלמעלה */
+        if (Math.random() < 0.45) addVictoryFlake(Math.random() * vw, -30, (Math.random() - 0.5) * 1.2, 1 + Math.random() * 1.8);
+        vFlakes = vFlakes.filter((f) => f.y < vh + 60 && f.x > -80 && f.x < vw + 80);
+        for (const f of vFlakes) {
+          f.vx *= 0.985;
+          f.vy = f.vy * 0.985 + 0.07;
+          f.sway += 0.04;
+          f.x += f.vx + Math.sin(f.sway) * 0.6;
+          f.y += f.vy;
+          f.rot += f.vr;
+          vCtx.save();
+          vCtx.globalAlpha = f.a;
+          vCtx.translate(f.x, f.y);
+          vCtx.rotate(f.rot);
+          vCtx.drawImage(f.sprite, -f.size / 2, -f.size / 2, f.size, f.size);
+          vCtx.restore();
+        }
+        vRaf = requestAnimationFrame(loopVictorySnow);
+      }
+
+      function startVictorySnow() {
+        stopVictorySnow();
+        resizeVictorySnow();
+        if (!calmMotion.matches) {
+          flakeBurst(vw / 2, vh * 0.4, 140, 17);
+          flakeCannon(true, 60);
+          flakeCannon(false, 60);
+          let left = true;
+          vCannonTimer = setInterval(() => {
+            flakeCannon(left, 35);
+            left = !left;
+          }, 1400);
+        }
+        loopVictorySnow();
+      }
+
+      function stopVictorySnow() {
+        cancelAnimationFrame(vRaf);
+        vRaf = 0;
+        clearInterval(vCannonTimer);
+        vFlakes = [];
+        vCtx.clearRect(0, 0, vw, vh);
       }
 
       function shuffle(arr) {
@@ -1918,7 +2069,8 @@
         const { team, index } = state.active;
         const card = state.boards[team][index];
 
-        if (typeof card.correctIndex === "number") {
+        const isTrivia = typeof card.correctIndex === "number";
+        if (isTrivia) {
           // only a right answer reveals the solution — a miss leaves the question
           // unspoiled so it still works as a puzzle next time
           if (ok) {
@@ -1929,12 +2081,18 @@
           if (list) list.classList.add("locked");
         }
 
+        // a right trivia answer stays on screen a moment so everyone sees it
+        // the celebration waits too, so its stars don't cover the answer
+        const hold = ok && isTrivia ? 2000 : 0;
+
         if (ok) {
           card.solved = true;
           card.open = true;
-          SFX.ok();
-          sealModal("ok");
-          starsFrom(document.querySelector(".modal-card"), 1);
+          setTimeout(() => {
+            SFX.ok();
+            flakesFrom(document.querySelector(".modal-card"));
+            sealModal("ok");
+          }, hold);
         } else {
           card.solved = false;
           card.open = false;
@@ -1954,8 +2112,6 @@
             );
             if (node) {
               node.classList.add("just-won");
-              /* התפרצות שנייה, קטנה — יוצאת מהקלף שזה עתה זכה בכוכב */
-              starsFrom(node, 0.55);
               node.addEventListener("animationend", function off() {
                 node.classList.remove("just-won");
                 node.removeEventListener("animationend", off);
@@ -1963,7 +2119,7 @@
             }
           }
           checkVictory(team, ok);
-        }, ok ? 1050 : 1100);
+        }, hold + (ok ? 1050 : 1100));
       }
 
       function onTimeout() {
@@ -1972,12 +2128,12 @@
         finishAttempt(false);
       }
 
-      /* שולח את מטר הכוכבים אל תוך תיבת האלמנט הנתון */
-      function starsFrom(node, power) {
+      /* מקיף את האלמנט הנתון בטבעת פתיתים */
+      function flakesFrom(node) {
         if (!node) return;
         const r = node.getBoundingClientRect();
         if (!r.width || !r.height) return;
-        burstStars(r, power);
+        burstFlakes(r);
       }
 
       /* מריץ על כרטיס השאלה את אנימציית הסגירה המתאימה לפסיקה */
@@ -1996,6 +2152,7 @@
 
       function hideVictoryFx() {
         stopVictorySound();
+        stopVictorySnow();
         const v = el("victory");
         v.classList.add("hidden");
         v.classList.remove("team-a", "team-b");
@@ -2018,6 +2175,7 @@
           burst.style.animation = "";
         }
         SFX.applause();
+        startVictorySnow();
         burstConfetti(true);
         setTimeout(() => burstConfetti(true), 350);
       }
