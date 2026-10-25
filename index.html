@@ -400,6 +400,14 @@
       z-index: 2;
     }
 
+    /* מתחת למסך הניצחון הקלפים מוסתרים ממילא — עוצרים את הזוהר כדי לא להעמיס */
+    body.won-a .card.win-line,
+    body.won-b .card.win-line,
+    body.won-a .card.win-line .face.front,
+    body.won-b .card.win-line .face.front {
+      animation-play-state: paused;
+    }
+
     @keyframes winCard {
       50% {
         filter: brightness(1.12);
@@ -1701,6 +1709,23 @@
       const sparkleImg = new Image();
       sparkleImg.src = "sparkle-particle.png";
 
+      /* עותקים מוקטנים של תמונות החלקיקים: הקטנה של תמונה גדולה בכל ציור,
+         מאות פעמים בפריים, היא מה שהעמיס על מסך הניצחון */
+      const spriteCache = new Map();
+      function sprite(img) {
+        if (!(img instanceof HTMLImageElement)) return img;
+        const cached = spriteCache.get(img);
+        if (cached) return cached;
+        if (!img.complete || !img.naturalWidth) return img;
+        const k = Math.min(1, 128 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * k);
+        c.height = Math.round(img.naturalHeight * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        spriteCache.set(img, c);
+        return c;
+      }
+
       /* פרח השלג מאיקון הקלף, מוקטן פעם אחת כדי שלא תצויר תמונה ענקית בכל פריים */
       let snowSprite = null;
       const snowImg = new Image();
@@ -1887,7 +1912,18 @@
         if (f >= 1) p.life = 0;
       }
 
-      function loopConfetti() {
+      let confettiLast = 0;
+
+      function loopConfetti(t) {
+        /* לא יותר מ־60 פריימים בשנייה, גם במסך 120Hz */
+        if (t !== undefined) {
+          const dt = t - confettiLast;
+          if (dt >= 0 && dt < 15) {
+            raf = requestAnimationFrame(loopConfetti);
+            return;
+          }
+          confettiLast = t;
+        }
         c2d.clearRect(0, 0, cw, ch);
         const now = performance.now();
         bits = bits.filter((p) => p.life > 0);
@@ -1913,7 +1949,7 @@
           c2d.globalAlpha = Math.max(0, alpha);
           if (p.img) {
             const sc = p.scale || 1;
-            c2d.drawImage(p.img, (-p.w * sc) / 2, (-p.h * sc) / 2, p.w * sc, p.h * sc);
+            c2d.drawImage(sprite(p.img), (-p.w * sc) / 2, (-p.h * sc) / 2, p.w * sc, p.h * sc);
           } else {
             c2d.fillStyle = p.color;
             c2d.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
@@ -1950,6 +1986,7 @@
       });
 
       function addVictoryStar(x, y, vx, vy) {
+        if (vStars.length >= 240) return;
         vStars.push({
           x: x,
           y: y,
@@ -1983,7 +2020,16 @@
         }
       }
 
-      function loopVictoryStars() {
+      let vLast = 0;
+
+      function loopVictoryStars(t) {
+        vRaf = requestAnimationFrame(loopVictoryStars);
+        /* לא יותר מ־60 פריימים בשנייה, גם במסך 120Hz */
+        if (t !== undefined) {
+          const dt = t - vLast;
+          if (dt >= 0 && dt < 15) return;
+          vLast = t;
+        }
         vCtx.clearRect(0, 0, vw, vh);
         /* מטר כוכבים קבוע מלמעלה */
         if (Math.random() < 0.45) addVictoryStar(Math.random() * vw, -30, (Math.random() - 0.5) * 1.2, 1 + Math.random() * 1.8);
@@ -2000,12 +2046,11 @@
           vCtx.translate(f.x, f.y);
           vCtx.rotate(f.rot);
           /* שליש נצנוצים, שליש פרחי שלג ושליש כוכבים */
-          if (f.kind < 0.33) vCtx.drawImage(sparkleImg, -f.size * 0.38, -f.size / 2, f.size * 0.76, f.size);
+          if (f.kind < 0.33) vCtx.drawImage(sprite(sparkleImg), -f.size * 0.38, -f.size / 2, f.size * 0.76, f.size);
           else if (f.kind < 0.66 && snowSprite) vCtx.drawImage(snowSprite, -f.size / 2, -f.size / 2, f.size, f.size);
-          else vCtx.drawImage(starImg, -f.size / 2, -f.size / 2, f.size, f.size);
+          else vCtx.drawImage(sprite(starImg), -f.size / 2, -f.size / 2, f.size, f.size);
           vCtx.restore();
         }
-        vRaf = requestAnimationFrame(loopVictoryStars);
       }
 
       function startVictoryStars() {
