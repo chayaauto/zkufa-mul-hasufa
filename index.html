@@ -77,21 +77,16 @@
       user-select: none;
       -webkit-user-drag: none;
       transform-origin: 50% 60%;
-      filter: drop-shadow(0 6px 18px rgba(10, 62, 102, 0.35));
+      /* הזוהר קבוע; רק התנועה מונפשת — אנימציה של filter על תמונה גדולה
+         מציירת אותה מחדש בכל פריים ומעמיסה על המחשב */
+      filter: drop-shadow(0 9px 22px rgba(10, 62, 102, 0.38))
+              drop-shadow(0 0 16px rgba(150, 215, 255, 0.55));
       animation: titleBreathe 7s ease-in-out infinite;
     }
 
     @keyframes titleBreathe {
-      0%, 100% {
-        transform: translateY(0) scale(1);
-        filter: drop-shadow(0 6px 18px rgba(10, 62, 102, 0.35))
-                drop-shadow(0 0 10px rgba(150, 215, 255, 0.35));
-      }
-      50% {
-        transform: translateY(-4px) scale(1.022);
-        filter: drop-shadow(0 12px 26px rgba(10, 62, 102, 0.42))
-                drop-shadow(0 0 22px rgba(150, 215, 255, 0.75));
-      }
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-4px) scale(1.022); }
     }
 
     button {
@@ -804,9 +799,9 @@
       border-radius: 50%;
       width: clamp(130px, 18vw, 200px);
       cursor: pointer;
-      animation:
-        ctaIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both,
-        ctaGlow 2.6s ease-in-out 2s infinite;
+      /* זוהר קבוע (לא מונפש) מאותה סיבה כמו בלוגו */
+      filter: drop-shadow(0 10px 24px rgba(10, 60, 100, 0.35)) drop-shadow(0 0 14px rgba(125, 211, 252, 0.6));
+      animation: ctaIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.15s both;
     }
 
     #intro .start-btn img {
@@ -849,11 +844,6 @@
       0%, 100% { rotate: 0deg; }
       25% { rotate: -4deg; }
       75% { rotate: 4deg; }
-    }
-
-    @keyframes ctaGlow {
-      0%, 100% { filter: drop-shadow(0 10px 24px rgba(10, 60, 100, 0.35)) drop-shadow(0 0 0 rgba(125, 211, 252, 0)); }
-      50% { filter: drop-shadow(0 10px 24px rgba(10, 60, 100, 0.35)) drop-shadow(0 0 22px rgba(125, 211, 252, 0.85)); }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1647,26 +1637,47 @@
         }
       }
 
-      function drawSnow() {
+      /* פתית עם הילה כחלחלה עדינה (כדי שיבלוט על הרקע הבהיר), מצויר פעם אחת
+         ומשוכפל — shadowBlur על כל פתית בכל פריים מעמיס מאוד */
+      const FLAKE_R = 8;
+      const FLAKE_PAD = 6;
+      const flakeSprite = document.createElement("canvas");
+      flakeSprite.width = flakeSprite.height = (FLAKE_R + FLAKE_PAD) * 2;
+      (function () {
+        const g = flakeSprite.getContext("2d");
+        g.shadowColor = "rgba(40, 110, 170, 0.45)";
+        g.shadowBlur = 8;
+        g.fillStyle = "#fff";
+        g.beginPath();
+        g.arc(FLAKE_R + FLAKE_PAD, FLAKE_R + FLAKE_PAD, FLAKE_R, 0, Math.PI * 2);
+        g.fill();
+      })();
+
+      /* 30 פריימים בשנייה מספיקים לשלג איטי; התזוזה נמדדת בזמן כדי שהמהירות לא תשתנה */
+      const SNOW_FRAME_MS = 1000 / 30;
+      let snowLast = 0;
+
+      function drawSnow(now) {
+        requestAnimationFrame(drawSnow);
+        if (now - snowLast < SNOW_FRAME_MS - 2) return;
+        const step = snowLast ? Math.min(4, (now - snowLast) / (1000 / 60)) : 1;
+        snowLast = now;
         snowCtx.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
-        /* הילה כחלחלה עדינה כדי שהפתיתים הלבנים יבלטו על הרקע הבהיר */
-        snowCtx.shadowColor = "rgba(40, 110, 170, 0.45)";
-        snowCtx.shadowBlur = 4;
         for (const f of flakes) {
-          f.y += f.vy;
-          f.x += f.vx + Math.sin(f.y * 0.01) * 0.3;
+          f.y += f.vy * step;
+          f.x += (f.vx + Math.sin(f.y * 0.01) * 0.3) * step;
           if (f.y > snowCanvas.height + 4) {
             f.y = -4;
             f.x = Math.random() * snowCanvas.width;
           }
           if (f.x < -4) f.x = snowCanvas.width + 4;
           if (f.x > snowCanvas.width + 4) f.x = -4;
-          snowCtx.beginPath();
-          snowCtx.fillStyle = "rgba(255,255,255," + f.a + ")";
-          snowCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
-          snowCtx.fill();
+          const k = f.r / FLAKE_R;
+          const d = flakeSprite.width * k;
+          snowCtx.globalAlpha = f.a;
+          snowCtx.drawImage(flakeSprite, f.x - d / 2, f.y - d / 2, d, d);
         }
-        requestAnimationFrame(drawSnow);
+        snowCtx.globalAlpha = 1;
       }
 
       addEventListener("resize", () => {
@@ -1674,7 +1685,7 @@
         initSnow();
       });
       initSnow();
-      drawSnow();
+      requestAnimationFrame(drawSnow);
 
       /* Confetti */
       const canvas = el("confetti");
