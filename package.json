@@ -1,0 +1,56 @@
+{
+  "name": "zkufa-mul-hasufa",
+  "productName": "זקופה מול הסופה",
+  "version": "1.0.0",
+  "description": "משחק קהל — זקופה מול הסופה",
+  "main": "electron-main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.chaya.zkufa-mul-hasufa",
+    "artifactName": "zkufa-mul-hasufa-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron-main.js",
+      "index.html",
+      "*.png",
+      "*.mp3",
+      "!*-old-backup.png"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.games"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "executableName": "zkufa-mul-hasufa"
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0"
+  }
+}

@@ -633,6 +633,49 @@
       padding: clamp(16px, 4vh, 48px);
     }
 
+    /* מסך תוקף שפג — מחליף את המשחק כולו אחרי תאריך התפוגה */
+    #expired {
+      z-index: 200;
+      background:
+        url("intro-bg.png") center center / cover no-repeat;
+      text-align: center;
+    }
+
+    .expired-card {
+      display: grid;
+      justify-items: center;
+      gap: clamp(10px, 2vh, 20px);
+      max-width: min(640px, 92vw);
+      padding: clamp(22px, 4vh, 40px) clamp(22px, 4vw, 48px);
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(26, 122, 184, 0.3);
+      box-shadow: 0 20px 60px rgba(14, 62, 100, 0.25);
+    }
+
+    .expired-card img {
+      width: min(360px, 70vw);
+      height: auto;
+    }
+
+    .expired-card h2 {
+      color: #0b3f66;
+      font-size: clamp(1.5rem, 3.6vw, 2.3rem);
+      font-weight: 800;
+    }
+
+    .expired-card p {
+      color: #0b3f66;
+      font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+      font-weight: 600;
+    }
+
+    .expired-card a {
+      color: var(--accent);
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
+
     .overlay.hidden {
       opacity: 0;
       visibility: hidden;
@@ -1270,6 +1313,14 @@
 <body>
   <canvas id="snow" aria-hidden="true"></canvas>
 
+  <div class="overlay hidden" id="expired" role="alert">
+    <div class="expired-card">
+      <img src="title-logo.png" alt="זקופה מול הסופה" />
+      <h2>תוקף המשחק פג</h2>
+      <p>להזמנת משחק מותאם אישית: <a href="mailto:chaya7908.auto@gmail.com">chaya7908.auto@gmail.com</a></p>
+    </div>
+  </div>
+
   <div class="overlay" id="intro">
     <div class="overlay-inner">
       <div class="intro-logo-wrap">
@@ -1364,6 +1415,14 @@
   <script>
     (function () {
       "use strict";
+
+      /* המשחק תקף עד סוף 05/11/2026; מ־06/11 בחצות (שעון המחשב) מוצג מסך התפוגה במקומו */
+      const EXPIRES_AT = new Date(2026, 10, 6);
+      if (new Date() >= EXPIRES_AT) {
+        document.getElementById("expired").classList.remove("hidden");
+        document.getElementById("intro").classList.add("hidden");
+        return;
+      }
 
       const CIRC = 2 * Math.PI * 45;
       const HOT_RATIO = 0.15;   /* מתחת ל-15% מהזמן שנקצב — עוברים לאדום */
