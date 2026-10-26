@@ -1499,8 +1499,7 @@
         timeLeft: 20,
         timerMax: 20,
         answered: false,
-        winnerShown: false,
-        winLine: { a: null, b: null },
+        winLines: { a: [], b: [] },
         boards: { a: [], b: [] },
       };
 
@@ -2114,19 +2113,18 @@
         });
       }
 
-      function findWinLine(team) {
+      /* השורות שהקלף הזה השלים עכשיו — כל שורה חדשה היא ניצחון בפני עצמה */
+      function newWinLines(team, index) {
         const board = state.boards[team];
-        for (let i = 0; i < WIN_LINES.length; i++) {
-          const line = WIN_LINES[i];
-          if (line.every((idx) => board[idx] && board[idx].solved)) return line;
-        }
-        return null;
+        return WIN_LINES.filter(
+          (line) => line.indexOf(index) !== -1 && line.every((idx) => board[idx] && board[idx].solved)
+        );
       }
 
       function renderGrid(team) {
         const grid = el(team === "a" ? "gridA" : "gridB");
         grid.innerHTML = "";
-        const winLine = state.winLine[team];
+        const winLines = state.winLines[team];
         state.boards[team].forEach((card, index) => {
           const btn = document.createElement("button");
           btn.type = "button";
@@ -2135,7 +2133,7 @@
           btn.dataset.index = String(index);
           if (card.solved) btn.classList.add("solved", "open");
           else if (card.open) btn.classList.add("open");
-          if (winLine && winLine.indexOf(index) !== -1) btn.classList.add("win-line");
+          if (winLines.some((line) => line.indexOf(index) !== -1)) btn.classList.add("win-line");
 
           const front = card.solved
             ? '<img class="icon" src="star-badge.png" alt="" />'
@@ -2379,7 +2377,7 @@
               });
             }
           }
-          checkVictory(team, ok);
+          checkVictory(team, index, ok);
         }, hold + (ok ? 1050 : 1100));
       }
 
@@ -2441,14 +2439,12 @@
         setTimeout(() => burstConfetti(true), 350);
       }
 
-      function checkVictory(lastTeam, wasCorrect) {
+      function checkVictory(lastTeam, index, wasCorrect) {
         if (!wasCorrect) return;
-        const line = findWinLine(lastTeam);
-        if (!line) return;
-        state.winLine[lastTeam] = line;
+        const lines = newWinLines(lastTeam, index);
+        if (!lines.length) return;
+        state.winLines[lastTeam] = state.winLines[lastTeam].concat(lines);
         renderAll();
-        if (state.winnerShown) return;
-        state.winnerShown = true;
         celebrateVictory(lastTeam);
       }
 
@@ -2457,8 +2453,7 @@
         buildBoard("a");
         buildBoard("b");
         state.started = true;
-        state.winnerShown = false;
-        state.winLine = { a: null, b: null };
+        state.winLines = { a: [], b: [] };
         hideVictoryFx();
         el("intro").classList.add("hidden");
         SFX.start();
